@@ -25,8 +25,8 @@ dips around January.
 polynomial such that
 *x*<sub>*t*</sub> = *β*<sub>0</sub> + *β*<sub>1</sub>*t* + *β*<sub>2</sub>*t*<sup>2</sup> + *y*<sub>*t*</sub>
 where *μ*<sub>*Y*</sub> = 0 and *x*<sub>*t*</sub> is the original time
-series. $\hat{\beta_0}=-1.000632* 10^{8}$,
-$\hat{\beta_1}=9.9172141* 10^{4}$, and
+series. $\hat{\beta_0}=-1.000632\times 10^{8}$,
+$\hat{\beta_1}=9.9172141\times10^{4}$, and
 $\hat{\beta_2}=-24.572$.
 
 ![](final_project_Alex_Cluff_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->![](final_project_Alex_Cluff_files/figure-gfm/unnamed-chunk-4-2.png)<!-- -->
