@@ -1,0 +1,250 @@
+---
+title: "Time Series Analysis of Homicides in the US"
+author: "Alex Cluff"
+date: "4/20/2021"
+output: github_document
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.height=3.5, message=FALSE, warning=FALSE)
+library(readr)
+library(knitr)
+library(astsa)
+homicides <- ts(read_csv("deaths.csv"), start = 2014, frequency = 12)
+```
+
+# Introduction
+
+|   The original dataset is called "Monthly Counts of Deaths by Select Causes, 2014-2019" from catalog.data.gov [[link]](https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2014-2019). The counts are exclusivly from the US. The analysis will be done on a subset of this data. Specifically death counts by homicide.
+```{r}
+plot(homicides, main = "Homicides Per Month (2014-2019)")
+```
+
+The data ranges from 2014 through 2019. Homicides are increasing over time with a parabolic trend. Seasonality appears to be yearly with large dips around January.
+
+```{r}
+
+t <- time(homicides)
+trend.coef <- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
+
+trend <- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2
+```
+
+# Trends, Seasonality, and ARMA Analysis
+## Estimating the Trend
+
+|   I fit the trend using regression modeling and a second order polynomial such that $x_t=\beta_0+\beta_1t+\beta_2t^2+y_t$ where $\mu_{Y}=0$ and $x_t$ is the original time series. $\hat{\beta_0}=`r round(trend.coef[[1]],3)`$, $\hat{\beta_1}=`r round(trend.coef[[2]],3)`$, and $\hat{\beta_2}=`r round(trend.coef[[3]],3)`$.
+
+```{r}
+plot(homicides, main = "Homicides Per Month with Trend")
+lines(trend, col = "red", lty = 2)
+
+detrended <- homicides - trend
+plot(detrended, main = "Detrended")
+abline(h = 0, col = "red", lty = 2)
+```
+
+## Estimating the Seasonal Component
+
+The seasonality is first estimated using monthly averages. Here they are after being estimated using a main effects regression model for the months such that $y_t=s_t+z_t$ where $y_t$ is the result of detrending the data and $s_t=\hat{s_j}$ is the mean for month $j=1,...12$.
+
+```{r}
+M = factor(rep(month.abb, length.out = 72), levels = month.abb)
+seasonal.means <- lm(detrended ~ M + 0)$coefficients
+seasonality.ts <- ts(rep(seasonal.means, length.out = 72), start = 2014, frequency = 12)
+round(seasonal.means, 2)
+plot(detrended, ylab = "deaths", main = "detrended")
+lines(seasonality.ts, col = "red", lty = 2)
+```
+
+## Fitting an ARMA model
+
+The detrended, deseasonalized time series:
+$$
+z_t=x_t-(\beta_0+\beta_1t+\beta_2t^2+s_t)
+$$
+
+```{r }
+z <- detrended - seasonality.ts
+plot(z, ylab = "deaths", main = "detrended and desesonalized")
+cf <- acf2(z)
+```
+
+From the ACF plot it is evident that the trend is not a great fit. I would have fit a higher order polynomial, however, R can not fit anything over a second order polynomial. The second order polynomial also makes for a very bad prediction.
+
+From the ACF graphs, I can see some correlation out to lag 3. After some testing, an AR(3,0) does fit the best.
+
+```{r}
+model <- arima(z, order = c(3,0,0))
+model
+```
+The Model:
+$$
+x_t = \phi_1x_{t-1}+\phi_2x_{t-2}+\phi_3x_{t-3}+w_t
+$$
+where,
+$$
+\phi_1=0.169,~\phi_2=0.220,~\phi_3=0.287,~\text{and}~w_t\sim^{iid} N(6.399, 2935)
+$$
+
+```{r fig.height=6}
+par(mfrow = c(2,2))
+residuals <- model$residuals
+
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf <- acf1(residuals)
+lag <- 1:20
+lags <- as.list(lag)
+p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
+plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
+abline(h=0.05, col = "blue", lty = 2)
+
+```
+
+From these diagnostic plots we can see the the model is an acceptable fit besides the correlation around lag 2 in the residuals. 
+
+95% confidence interval:
+```{r}
+lower = model$coef - 1.96 * sqrt(diag(model$var.coef))
+upper = model$coef + 1.96 * sqrt(diag(model$var.coef))
+rbind(lower,upper)
+coef <- round(c(model$coef, model$sigma2),3)
+```
+|   The standard deviations are slightly too large and the first two coefficients are not significant because the CIs contain 0. When fitting a model like this it would be a bad idea to remove the coefficients entirely when there is a significant $\phi_3$.
+
+Therefore, the final model is:
+$$
+z_t=x_t-(`r round(trend.coef[[1]],3)`+`r round(trend.coef[[2]],3)`t+`r round(trend.coef[[3]],3)`t^2+\hat{s_t})
+$$
+$$
+x_t = `r coef[1]`x_{t-1}+`r coef[2]`x_{t-2}+`r coef[3]`x_{t-3}+w_t, ~~ w_t \sim N(`r coef[4]`,`r coef[5]`)
+$$
+Where $t$ is month $j=1,..,12$, $\hat{s_t}$ is:
+```{r}
+round(seasonal.means, 2)
+```
+
+
+
+# SARIMA Modeling
+## Fitting the Model
+
+|   For the SARIMA model, the best fit was achieved with a SARIMA(2,1,0)(0,1,1)[12] model of the form SARIMA(p,d,q)(P,D,Q)[S]. Originally I fit a third order AR component similar to my previous ARMA model. The model did not fit well. This model has the lowest AIC. The data has seasonality as well as a trend so it needs to be differenced twice. S = 12 and d/D = 1. A seasonal MA of order 1 also decreased the AIC, so Q = 1.
+
+ARIMA model:
+$$
+(1-\phi_1B-\phi_2B^2)(1-B)(1-B^{12})x_t=(1+\theta_1B^{12})w_t
+$$
+such that:
+$$
+(1+0.7173B+0.3790B^2)(1-B)(1-B^{12})x_t=(1+0.7089B^{12})w_t, ~~ w_t \sim^{iid} N(0,4702)
+$$
+
+
+```{r}
+model.sarima <- sarima(homicides, 2, 1, 0, 0, 1, 1, 12, details = F)
+model.sarima
+```
+
+
+```{r fig.height=6}
+residuals <- model.sarima$fit$residuals
+par(mfrow = c(2,2))
+
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf <- acf1(residuals)
+lag <- 1:35
+lags <- as.list(lag)
+p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
+plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
+abline(h=0.05, col = "blue", lty = 2)
+```
+
+This model fits quite well. The spike around lag 2 and the lower end of the Q-Q plot stand out, but do not look like a huge problem.
+
+## Prediction
+
+This is a prediction for the next 24 months.
+
+```{r}
+sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)
+```
+
+# Comparing Models
+
+|   The largest difference between the two methods is using the differencing when fitting the SARIMA model. This allowed for a much better fit. Residuals for the ARMA model had correlation when they should not have. This is due to the poor fit of the trend. On a similar note, the parabolic trend used for in the first did not capture the overall trend very well. The forecast continued the trend and went down. In reality, the trend would go up as in the figure above. This would have been slightly better if R allows fitting a higher order polynomial as I mentioned before.
+
+# Conclusion
+
+|   In general, differencing is much easier and effective at capturing complicated trends. Seasonal AR and MA componets also add very important correlation to a model. A more complicated ARIMA is not always needed, but there are many benefits.
+
+# Code
+```{.R}
+knitr::opts_chunk$set(echo = FALSE, fig.height=3.5, message=FALSE, warning=FALSE)
+library(readr)
+library(knitr)
+library(astsa)
+homicides <- ts(read_csv("deaths.csv"), start = 2014, frequency = 12)
+plot(homicides, main = "Homicides Per Month (2014-2019)")
+t <- time(homicides)
+trend.coef <- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
+trend <- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2
+plot(homicides, main = "Homicides Per Month with Trend")
+lines(trend, col = "red", lty = 2)
+detrended <- homicides - trend
+plot(detrended, main = "Detrended")
+abline(h = 0, col = "red", lty = 2)
+M = factor(rep(month.abb, length.out = 72), levels = month.abb)
+seasonal.means <- lm(detrended ~ M + 0)$coefficients
+seasonality.ts <- ts(rep(seasonal.means, length.out = 72), start = 2014, frequency = 12)
+round(seasonal.means, 2)
+plot(detrended, ylab = "deaths", main = "detrended")
+lines(seasonality.ts, col = "red", lty = 2)
+z <- detrended - seasonality.ts
+plot(z, ylab = "deaths", main = "detrended and desesonalized")
+cf <- acf2(z)
+model <- arima(z, order = c(3,0,0))
+model
+par(mfrow = c(2,2))
+residuals <- model$residuals
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf <- acf1(residuals)
+lag <- 1:20
+lags <- as.list(lag)
+p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
+plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
+abline(h=0.05, col = "blue", lty = 2)
+lower = model$coef - 1.96 * sqrt(diag(model$var.coef))
+upper = model$coef + 1.96 * sqrt(diag(model$var.coef))
+rbind(lower,upper)
+coef <- round(c(model$coef, model$sigma2),3)
+round(seasonal.means, 2)
+model.sarima <- sarima(homicides, 2, 1, 0, 0, 1, 1, 12, details = F)
+model.sarima
+residuals <- model.sarima$fit$residuals
+par(mfrow = c(2,2))
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf <- acf1(residuals)
+lag <- 1:35
+lags <- as.list(lag)
+p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
+plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
+abline(h=0.05, col = "blue", lty = 2)
+sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)
+savehistory("C:/Users/AlexC/OneDrive/rws/5550/project/code.Rhistory")
+```
+
+
+
+
+
+
+
