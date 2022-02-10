@@ -178,7 +178,7 @@ pre code {
 
 <h1 class="title toc-ignore">Time Series Analysis of Homicides in the US</h1>
 <h4 class="author">Alex Cluff</h4>
-<h4 class="date">4/20/2021<br>(last edit 2022-02-10 10:03:33)</h4>
+<h4 class="date">4/20/2021<br>(last edit 2022-02-10 10:24:48)</h4>
 
 </div>
 
@@ -198,13 +198,13 @@ pre code {
 </ul></li>
 <li><a href="#comparing-models">Comparing Models</a></li>
 <li><a href="#conclusion">Conclusion</a></li>
-<li><a href="#code">Code</a></li>
 </ul>
 </div>
 
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <div class="line-block">  The original dataset is called “Monthly Counts of Deaths by Select Causes, 2014-2019” from catalog.data.gov <a href="https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2014-2019">[link]</a>. The counts are exclusively from the US. The analysis will be done on a subset of this data. Specifically death counts by homicide.</div>
+<pre class="r"><code>plot(homicides, main = &quot;Homicides Per Month (2014-2019)&quot;)</code></pre>
 <p><img src="index_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
 <p>The data ranges from 2014 through 2019. Homicides are increasing over time with a parabolic trend. Seasonality appears to be yearly with large dips around January.</p>
 </div>
@@ -212,16 +212,32 @@ pre code {
 <h1>Trends, Seasonality, and ARMA Analysis</h1>
 <div id="estimating-the-trend" class="section level2">
 <h2>Estimating the Trend</h2>
+<pre class="r"><code>t &lt;- time(homicides)
+trend.coef &lt;- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
+
+trend &lt;- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2</code></pre>
 <div class="line-block">  I fit the trend using regression modeling and a second order polynomial such that <span class="math inline">\(x_t=\beta_0+\beta_1t+\beta_2t^2+y_t\)</span> where <span class="math inline">\(\mu_{Y}=0\)</span> and <span class="math inline">\(x_t\)</span> is the original time series. <span class="math inline">\(\hat{\beta_0}=-1.000632\times 10^{8}\)</span>, <span class="math inline">\(\hat{\beta_1}=9.9172141\times 10^{4}\)</span>, and <span class="math inline">\(\hat{\beta_2}=-24.572\)</span>.</div>
-<p><img src="index_files/figure-html/unnamed-chunk-4-1.png" width="672" /><img src="index_files/figure-html/unnamed-chunk-4-2.png" width="672" /></p>
+<pre class="r"><code>plot(homicides, main = &quot;Homicides Per Month with Trend&quot;)
+lines(trend, col = &quot;red&quot;, lty = 2)</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<pre class="r"><code>detrended &lt;- homicides - trend
+plot(detrended, main = &quot;Detrended&quot;)
+abline(h = 0, col = &quot;red&quot;, lty = 2)</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-4-2.png" width="672" /></p>
 </div>
 <div id="estimating-the-seasonal-component" class="section level2">
 <h2>Estimating the Seasonal Component</h2>
 <p>The seasonality is first estimated using monthly averages. Here they are after being estimated using a main effects regression model for the months such that <span class="math inline">\(y_t=s_t+z_t\)</span> where <span class="math inline">\(y_t\)</span> is the result of detrending the data and <span class="math inline">\(s_t=\hat{s_j}\)</span> is the mean for month <span class="math inline">\(j=1,...12\)</span>.</p>
+<pre class="r"><code>M = factor(rep(month.abb, length.out = 72), levels = month.abb)
+seasonal.means &lt;- lm(detrended ~ M + 0)$coefficients
+seasonality.ts &lt;- ts(rep(seasonal.means, length.out = 72), start = 2014, frequency = 12)
+round(seasonal.means, 2)</code></pre>
 <pre><code>##    MJan    MFeb    MMar    MApr    MMay    MJun    MJul    MAug    MSep    MOct 
 ##   12.33 -247.49 -105.64  -84.27   51.10   64.65  152.54   93.43   28.00   22.58 
 ##    MNov    MDec 
 ##   -5.16   17.93</code></pre>
+<pre class="r"><code>plot(detrended, ylab = &quot;deaths&quot;, main = &quot;detrended&quot;)
+lines(seasonality.ts, col = &quot;red&quot;, lty = 2)</code></pre>
 <p><img src="index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 </div>
 <div id="fitting-an-arma-model" class="section level2">
@@ -229,9 +245,15 @@ pre code {
 <p>The detrended, deseasonalized time series: <span class="math display">\[
 z_t=x_t-(\beta_0+\beta_1t+\beta_2t^2+s_t)
 \]</span></p>
-<p><img src="index_files/figure-html/unnamed-chunk-6-1.png" width="672" /><img src="index_files/figure-html/unnamed-chunk-6-2.png" width="672" /></p>
+<pre class="r"><code>z &lt;- detrended - seasonality.ts
+plot(z, ylab = &quot;deaths&quot;, main = &quot;detrended and desesonalized&quot;)</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<pre class="r"><code>cf &lt;- acf2(z)</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-6-2.png" width="672" /></p>
 <p>From the ACF plot it is evident that the trend is not a great fit. I would have fit a higher order polynomial, however, R can not fit anything over a second order polynomial. The second order polynomial also makes for a very bad prediction.</p>
 <p>From the ACF graphs, I can see some correlation out to lag 3. After some testing, an AR(3,0) does fit the best.</p>
+<pre class="r"><code>model &lt;- arima(z, order = c(3,0,0))
+model</code></pre>
 <pre><code>## 
 ## Call:
 ## arima(x = z, order = c(3, 0, 0))
@@ -247,18 +269,35 @@ x_t = \phi_1x_{t-1}+\phi_2x_{t-2}+\phi_3x_{t-3}+w_t
 \]</span> where, <span class="math display">\[
 \phi_1=0.169,~\phi_2=0.220,~\phi_3=0.287,~\text{and}~w_t\sim^{iid} N(6.399, 2935)
 \]</span></p>
+<pre class="r"><code>par(mfrow = c(2,2))
+residuals &lt;- model$residuals
+
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf &lt;- acf1(residuals)
+lag &lt;- 1:20
+lags &lt;- as.list(lag)
+p.values &lt;- sapply(lags, function(x) Box.test(residuals, x, &quot;Ljung-Box&quot;)$p.value)
+plot(lag, p.values, ylim = c(0,1), main = &quot;Box Test P-values for the Residuals&quot;)
+abline(h=0.05, col = &quot;blue&quot;, lty = 2)</code></pre>
 <p><img src="index_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
 <p>From these diagnostic plots we can see the the model is an acceptable fit besides the correlation around lag 2 in the residuals.</p>
 <p>95% confidence interval:</p>
+<pre class="r"><code>lower = model$coef - 1.96 * sqrt(diag(model$var.coef))
+upper = model$coef + 1.96 * sqrt(diag(model$var.coef))
+rbind(lower,upper)</code></pre>
 <pre><code>##               ar1          ar2        ar3 intercept
 ## lower -0.06092554 -0.006529079 0.05292215 -30.62897
 ## upper  0.39905895  0.445937975 0.52029038  43.42608</code></pre>
+<pre class="r"><code>coef &lt;- round(c(model$coef, model$sigma2),3)</code></pre>
 <div class="line-block">  The standard deviations are slightly too large and the first two coefficients are not significant because the CIs contain 0. When fitting a model like this it would be a bad idea to remove the coefficients entirely when there is a significant <span class="math inline">\(\phi_3\)</span>.</div>
 <p>Therefore, the final model is: <span class="math display">\[
 z_t=x_t-(-1.000632\times 10^{8}+9.9172141\times 10^{4}t+-24.572t^2+\hat{s_t})
 \]</span> <span class="math display">\[
 x_t = 0.169x_{t-1}+0.22x_{t-2}+0.287x_{t-3}+w_t, ~~ w_t \sim N(6.399,2935.034)
 \]</span> Where <span class="math inline">\(t\)</span> is month <span class="math inline">\(j=1,..,12\)</span>, <span class="math inline">\(\hat{s_t}\)</span> is:</p>
+<pre class="r"><code>round(seasonal.means, 2)</code></pre>
 <pre><code>##    MJan    MFeb    MMar    MApr    MMay    MJun    MJul    MAug    MSep    MOct 
 ##   12.33 -247.49 -105.64  -84.27   51.10   64.65  152.54   93.43   28.00   22.58 
 ##    MNov    MDec 
@@ -275,6 +314,8 @@ x_t = 0.169x_{t-1}+0.22x_{t-2}+0.287x_{t-3}+w_t, ~~ w_t \sim N(6.399,2935.034)
 \]</span> such that: <span class="math display">\[
 (1+0.7173B+0.3790B^2)(1-B)(1-B^{12})x_t=(1+0.7089B^{12})w_t, ~~ w_t \sim^{iid} N(0,4702)
 \]</span></p>
+<pre class="r"><code>model.sarima &lt;- sarima(homicides, 2, 1, 0, 0, 1, 1, 12, details = F)
+model.sarima</code></pre>
 <pre><code>## $fit
 ## 
 ## Call:
@@ -306,12 +347,25 @@ x_t = 0.169x_{t-1}+0.22x_{t-2}+0.287x_{t-3}+w_t, ~~ w_t \sim N(6.399,2935.034)
 ## 
 ## $BIC
 ## [1] 11.71902</code></pre>
+<pre class="r"><code>residuals &lt;- model.sarima$fit$residuals
+par(mfrow = c(2,2))
+
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf &lt;- acf1(residuals)
+lag &lt;- 1:35
+lags &lt;- as.list(lag)
+p.values &lt;- sapply(lags, function(x) Box.test(residuals, x, &quot;Ljung-Box&quot;)$p.value)
+plot(lag, p.values, ylim = c(0,1), main = &quot;Box Test P-values for the Residuals&quot;)
+abline(h=0.05, col = &quot;blue&quot;, lty = 2)</code></pre>
 <p><img src="index_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
 <p>This model fits quite well. The spike around lag 2 and the lower end of the Q-Q plot stand out, but do not look like a huge problem.</p>
 </div>
 <div id="prediction" class="section level2">
 <h2>Prediction</h2>
 <p>This is a prediction for the next 24 months.</p>
+<pre class="r"><code>sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)</code></pre>
 <p><img src="index_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
 <pre><code>## $pred
 ##           Jan      Feb      Mar      Apr      May      Jun      Jul      Aug
@@ -337,65 +391,6 @@ x_t = 0.169x_{t-1}+0.22x_{t-2}+0.287x_{t-3}+w_t, ~~ w_t \sim N(6.399,2935.034)
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>
 <div class="line-block">  In general, differencing is much easier and effective at capturing complicated trends. Seasonal AR and MA componets also add very important correlation to a model. A more complicated ARIMA is not always needed, but there are many benefits.</div>
-</div>
-<div id="code" class="section level1">
-<h1>Code</h1>
-<pre class="R"><code>knitr::opts_chunk$set(echo = FALSE, fig.height=3.5, message=FALSE, warning=FALSE)
-library(readr)
-library(knitr)
-library(astsa)
-homicides &lt;- ts(read_csv(&quot;deaths.csv&quot;), start = 2014, frequency = 12)
-plot(homicides, main = &quot;Homicides Per Month (2014-2019)&quot;)
-t &lt;- time(homicides)
-trend.coef &lt;- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
-trend &lt;- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2
-plot(homicides, main = &quot;Homicides Per Month with Trend&quot;)
-lines(trend, col = &quot;red&quot;, lty = 2)
-detrended &lt;- homicides - trend
-plot(detrended, main = &quot;Detrended&quot;)
-abline(h = 0, col = &quot;red&quot;, lty = 2)
-M = factor(rep(month.abb, length.out = 72), levels = month.abb)
-seasonal.means &lt;- lm(detrended ~ M + 0)$coefficients
-seasonality.ts &lt;- ts(rep(seasonal.means, length.out = 72), start = 2014, frequency = 12)
-round(seasonal.means, 2)
-plot(detrended, ylab = &quot;deaths&quot;, main = &quot;detrended&quot;)
-lines(seasonality.ts, col = &quot;red&quot;, lty = 2)
-z &lt;- detrended - seasonality.ts
-plot(z, ylab = &quot;deaths&quot;, main = &quot;detrended and desesonalized&quot;)
-cf &lt;- acf2(z)
-model &lt;- arima(z, order = c(3,0,0))
-model
-par(mfrow = c(2,2))
-residuals &lt;- model$residuals
-plot(residuals)
-qqnorm(residuals)
-qqline(residuals)
-acf &lt;- acf1(residuals)
-lag &lt;- 1:20
-lags &lt;- as.list(lag)
-p.values &lt;- sapply(lags, function(x) Box.test(residuals, x, &quot;Ljung-Box&quot;)$p.value)
-plot(lag, p.values, ylim = c(0,1), main = &quot;Box Test P-values for the Residuals&quot;)
-abline(h=0.05, col = &quot;blue&quot;, lty = 2)
-lower = model$coef - 1.96 * sqrt(diag(model$var.coef))
-upper = model$coef + 1.96 * sqrt(diag(model$var.coef))
-rbind(lower,upper)
-coef &lt;- round(c(model$coef, model$sigma2),3)
-round(seasonal.means, 2)
-model.sarima &lt;- sarima(homicides, 2, 1, 0, 0, 1, 1, 12, details = F)
-model.sarima
-residuals &lt;- model.sarima$fit$residuals
-par(mfrow = c(2,2))
-plot(residuals)
-qqnorm(residuals)
-qqline(residuals)
-acf &lt;- acf1(residuals)
-lag &lt;- 1:35
-lags &lt;- as.list(lag)
-p.values &lt;- sapply(lags, function(x) Box.test(residuals, x, &quot;Ljung-Box&quot;)$p.value)
-plot(lag, p.values, ylim = c(0,1), main = &quot;Box Test P-values for the Residuals&quot;)
-abline(h=0.05, col = &quot;blue&quot;, lty = 2)
-sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)
-savehistory(&quot;C:/Users/AlexC/OneDrive/rws/5550/project/code.Rhistory&quot;)</code></pre>
 </div>
 
 

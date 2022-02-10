@@ -9,12 +9,12 @@ output:
     toc: true
     
 knit: (function(inputFile, encoding) {
-  rmarkdown::render(inputFile, encoding = encoding, output_dir = "./docs", output_file = "index.html");
-  rmarkdown::render(inputFile, encoding = encoding, output_format = "pdf_document")})
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "./docs", output_file = "index.html", quiet=TRUE);
+  rmarkdown::render(inputFile, encoding = encoding, output_format = "pdf_document", quiet = TRUE)})
 ---
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, fig.height=3.5, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, message=FALSE, warning=FALSE)
 library(readr)
 library(knitr)
 library(astsa)
@@ -30,16 +30,16 @@ plot(homicides, main = "Homicides Per Month (2014-2019)")
 
 The data ranges from 2014 through 2019. Homicides are increasing over time with a parabolic trend. Seasonality appears to be yearly with large dips around January.
 
-```{r}
+# Trends, Seasonality, and ARMA Analysis
+## Estimating the Trend
 
+```{r}
 t <- time(homicides)
 trend.coef <- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
 
 trend <- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2
-```
 
-# Trends, Seasonality, and ARMA Analysis
-## Estimating the Trend
+```
 
 |   I fit the trend using regression modeling and a second order polynomial such that $x_t=\beta_0+\beta_1t+\beta_2t^2+y_t$ where $\mu_{Y}=0$ and $x_t$ is the original time series. $\hat{\beta_0}=`r round(trend.coef[[1]],3)`$, $\hat{\beta_1}=`r round(trend.coef[[2]],3)`$, and $\hat{\beta_2}=`r round(trend.coef[[3]],3)`$.
 
@@ -108,7 +108,6 @@ lags <- as.list(lag)
 p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
 plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
 abline(h=0.05, col = "blue", lty = 2)
-
 ```
 
 From these diagnostic plots we can see the the model is an acceptable fit besides the correlation around lag 2 in the residuals. 
@@ -190,65 +189,6 @@ sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)
 
 |   In general, differencing is much easier and effective at capturing complicated trends. Seasonal AR and MA componets also add very important correlation to a model. A more complicated ARIMA is not always needed, but there are many benefits.
 
-# Code
-```{.R}
-knitr::opts_chunk$set(echo = FALSE, fig.height=3.5, message=FALSE, warning=FALSE)
-library(readr)
-library(knitr)
-library(astsa)
-homicides <- ts(read_csv("deaths.csv"), start = 2014, frequency = 12)
-plot(homicides, main = "Homicides Per Month (2014-2019)")
-t <- time(homicides)
-trend.coef <- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
-trend <- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2
-plot(homicides, main = "Homicides Per Month with Trend")
-lines(trend, col = "red", lty = 2)
-detrended <- homicides - trend
-plot(detrended, main = "Detrended")
-abline(h = 0, col = "red", lty = 2)
-M = factor(rep(month.abb, length.out = 72), levels = month.abb)
-seasonal.means <- lm(detrended ~ M + 0)$coefficients
-seasonality.ts <- ts(rep(seasonal.means, length.out = 72), start = 2014, frequency = 12)
-round(seasonal.means, 2)
-plot(detrended, ylab = "deaths", main = "detrended")
-lines(seasonality.ts, col = "red", lty = 2)
-z <- detrended - seasonality.ts
-plot(z, ylab = "deaths", main = "detrended and desesonalized")
-cf <- acf2(z)
-model <- arima(z, order = c(3,0,0))
-model
-par(mfrow = c(2,2))
-residuals <- model$residuals
-plot(residuals)
-qqnorm(residuals)
-qqline(residuals)
-acf <- acf1(residuals)
-lag <- 1:20
-lags <- as.list(lag)
-p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
-plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
-abline(h=0.05, col = "blue", lty = 2)
-lower = model$coef - 1.96 * sqrt(diag(model$var.coef))
-upper = model$coef + 1.96 * sqrt(diag(model$var.coef))
-rbind(lower,upper)
-coef <- round(c(model$coef, model$sigma2),3)
-round(seasonal.means, 2)
-model.sarima <- sarima(homicides, 2, 1, 0, 0, 1, 1, 12, details = F)
-model.sarima
-residuals <- model.sarima$fit$residuals
-par(mfrow = c(2,2))
-plot(residuals)
-qqnorm(residuals)
-qqline(residuals)
-acf <- acf1(residuals)
-lag <- 1:35
-lags <- as.list(lag)
-p.values <- sapply(lags, function(x) Box.test(residuals, x, "Ljung-Box")$p.value)
-plot(lag, p.values, ylim = c(0,1), main = "Box Test P-values for the Residuals")
-abline(h=0.05, col = "blue", lty = 2)
-sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)
-savehistory("C:/Users/AlexC/OneDrive/rws/5550/project/code.Rhistory")
-```
 
 
 
