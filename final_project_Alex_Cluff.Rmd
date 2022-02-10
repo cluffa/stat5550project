@@ -1,8 +1,16 @@
 ---
 title: "Time Series Analysis of Homicides in the US"
 author: "Alex Cluff"
-date: "4/20/2021"
-output: github_document
+date: "4/20/2021<br>(last edit `r Sys.time()`)"
+output:
+  html_document:
+    code_folding: hide
+    self_contained: false
+    toc: true
+    
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "./docs", output_file = "index.html");
+  rmarkdown::render(inputFile, encoding = encoding, output_format = "pdf_document")})
 ---
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
@@ -15,7 +23,7 @@ homicides <- ts(read_csv("deaths.csv"), start = 2014, frequency = 12)
 
 # Introduction
 
-|   The original dataset is called "Monthly Counts of Deaths by Select Causes, 2014-2019" from catalog.data.gov [[link]](https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2014-2019). The counts are exclusivly from the US. The analysis will be done on a subset of this data. Specifically death counts by homicide.
+|   The original dataset is called "Monthly Counts of Deaths by Select Causes, 2014-2019" from catalog.data.gov [[link]](https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2014-2019). The counts are exclusively from the US. The analysis will be done on a subset of this data. Specifically death counts by homicide.
 ```{r}
 plot(homicides, main = "Homicides Per Month (2014-2019)")
 ```

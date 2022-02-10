@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Alex Cluff" />
+
+
+<title>Time Series Analysis of Homicides in the US</title>
+
+<script src="index_files/header-attrs-2.11/header-attrs.js"></script>
+<script src="index_files/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="index_files/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="index_files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="index_files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="index_files/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="index_files/navigation-1.1/tabsets.js"></script>
+<script src="index_files/navigation-1.1/codefolding.js"></script>
+<link href="index_files/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="index_files/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Time Series Analysis of Homicides in the US</h1>
+<h4 class="author">Alex Cluff</h4>
+<h4 class="date">4/20/2021<br>(last edit 2022-02-10 10:03:33)</h4>
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#trends-seasonality-and-arma-analysis">Trends, Seasonality, and ARMA Analysis</a>
+<ul>
+<li><a href="#estimating-the-trend">Estimating the Trend</a></li>
+<li><a href="#estimating-the-seasonal-component">Estimating the Seasonal Component</a></li>
+<li><a href="#fitting-an-arma-model">Fitting an ARMA model</a></li>
+</ul></li>
+<li><a href="#sarima-modeling">SARIMA Modeling</a>
+<ul>
+<li><a href="#fitting-the-model">Fitting the Model</a></li>
+<li><a href="#prediction">Prediction</a></li>
+</ul></li>
+<li><a href="#comparing-models">Comparing Models</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#code">Code</a></li>
+</ul>
+</div>
+
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<div class="line-block">  The original dataset is called “Monthly Counts of Deaths by Select Causes, 2014-2019” from catalog.data.gov <a href="https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2014-2019">[link]</a>. The counts are exclusively from the US. The analysis will be done on a subset of this data. Specifically death counts by homicide.</div>
+<p><img src="index_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<p>The data ranges from 2014 through 2019. Homicides are increasing over time with a parabolic trend. Seasonality appears to be yearly with large dips around January.</p>
+</div>
+<div id="trends-seasonality-and-arma-analysis" class="section level1">
+<h1>Trends, Seasonality, and ARMA Analysis</h1>
+<div id="estimating-the-trend" class="section level2">
+<h2>Estimating the Trend</h2>
+<div class="line-block">  I fit the trend using regression modeling and a second order polynomial such that <span class="math inline">\(x_t=\beta_0+\beta_1t+\beta_2t^2+y_t\)</span> where <span class="math inline">\(\mu_{Y}=0\)</span> and <span class="math inline">\(x_t\)</span> is the original time series. <span class="math inline">\(\hat{\beta_0}=-1.000632\times 10^{8}\)</span>, <span class="math inline">\(\hat{\beta_1}=9.9172141\times 10^{4}\)</span>, and <span class="math inline">\(\hat{\beta_2}=-24.572\)</span>.</div>
+<p><img src="index_files/figure-html/unnamed-chunk-4-1.png" width="672" /><img src="index_files/figure-html/unnamed-chunk-4-2.png" width="672" /></p>
+</div>
+<div id="estimating-the-seasonal-component" class="section level2">
+<h2>Estimating the Seasonal Component</h2>
+<p>The seasonality is first estimated using monthly averages. Here they are after being estimated using a main effects regression model for the months such that <span class="math inline">\(y_t=s_t+z_t\)</span> where <span class="math inline">\(y_t\)</span> is the result of detrending the data and <span class="math inline">\(s_t=\hat{s_j}\)</span> is the mean for month <span class="math inline">\(j=1,...12\)</span>.</p>
+<pre><code>##    MJan    MFeb    MMar    MApr    MMay    MJun    MJul    MAug    MSep    MOct 
+##   12.33 -247.49 -105.64  -84.27   51.10   64.65  152.54   93.43   28.00   22.58 
+##    MNov    MDec 
+##   -5.16   17.93</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+</div>
+<div id="fitting-an-arma-model" class="section level2">
+<h2>Fitting an ARMA model</h2>
+<p>The detrended, deseasonalized time series: <span class="math display">\[
+z_t=x_t-(\beta_0+\beta_1t+\beta_2t^2+s_t)
+\]</span></p>
+<p><img src="index_files/figure-html/unnamed-chunk-6-1.png" width="672" /><img src="index_files/figure-html/unnamed-chunk-6-2.png" width="672" /></p>
+<p>From the ACF plot it is evident that the trend is not a great fit. I would have fit a higher order polynomial, however, R can not fit anything over a second order polynomial. The second order polynomial also makes for a very bad prediction.</p>
+<p>From the ACF graphs, I can see some correlation out to lag 3. After some testing, an AR(3,0) does fit the best.</p>
+<pre><code>## 
+## Call:
+## arima(x = z, order = c(3, 0, 0))
+## 
+## Coefficients:
+##          ar1     ar2     ar3  intercept
+##       0.1691  0.2197  0.2866     6.3986
+## s.e.  0.1173  0.1154  0.1192    18.8916
+## 
+## sigma^2 estimated as 2935:  log likelihood = -389.89,  aic = 789.78</code></pre>
+<p>The Model: <span class="math display">\[
+x_t = \phi_1x_{t-1}+\phi_2x_{t-2}+\phi_3x_{t-3}+w_t
+\]</span> where, <span class="math display">\[
+\phi_1=0.169,~\phi_2=0.220,~\phi_3=0.287,~\text{and}~w_t\sim^{iid} N(6.399, 2935)
+\]</span></p>
+<p><img src="index_files/figure-html/unnamed-chunk-8-1.png" width="672" /></p>
+<p>From these diagnostic plots we can see the the model is an acceptable fit besides the correlation around lag 2 in the residuals.</p>
+<p>95% confidence interval:</p>
+<pre><code>##               ar1          ar2        ar3 intercept
+## lower -0.06092554 -0.006529079 0.05292215 -30.62897
+## upper  0.39905895  0.445937975 0.52029038  43.42608</code></pre>
+<div class="line-block">  The standard deviations are slightly too large and the first two coefficients are not significant because the CIs contain 0. When fitting a model like this it would be a bad idea to remove the coefficients entirely when there is a significant <span class="math inline">\(\phi_3\)</span>.</div>
+<p>Therefore, the final model is: <span class="math display">\[
+z_t=x_t-(-1.000632\times 10^{8}+9.9172141\times 10^{4}t+-24.572t^2+\hat{s_t})
+\]</span> <span class="math display">\[
+x_t = 0.169x_{t-1}+0.22x_{t-2}+0.287x_{t-3}+w_t, ~~ w_t \sim N(6.399,2935.034)
+\]</span> Where <span class="math inline">\(t\)</span> is month <span class="math inline">\(j=1,..,12\)</span>, <span class="math inline">\(\hat{s_t}\)</span> is:</p>
+<pre><code>##    MJan    MFeb    MMar    MApr    MMay    MJun    MJul    MAug    MSep    MOct 
+##   12.33 -247.49 -105.64  -84.27   51.10   64.65  152.54   93.43   28.00   22.58 
+##    MNov    MDec 
+##   -5.16   17.93</code></pre>
+</div>
+</div>
+<div id="sarima-modeling" class="section level1">
+<h1>SARIMA Modeling</h1>
+<div id="fitting-the-model" class="section level2">
+<h2>Fitting the Model</h2>
+<div class="line-block">  For the SARIMA model, the best fit was achieved with a SARIMA(2,1,0)(0,1,1)[12] model of the form SARIMA(p,d,q)(P,D,Q)[S]. Originally I fit a third order AR component similar to my previous ARMA model. The model did not fit well. This model has the lowest AIC. The data has seasonality as well as a trend so it needs to be differenced twice. S = 12 and d/D = 1. A seasonal MA of order 1 also decreased the AIC, so Q = 1.</div>
+<p>ARIMA model: <span class="math display">\[
+(1-\phi_1B-\phi_2B^2)(1-B)(1-B^{12})x_t=(1+\theta_1B^{12})w_t
+\]</span> such that: <span class="math display">\[
+(1+0.7173B+0.3790B^2)(1-B)(1-B^{12})x_t=(1+0.7089B^{12})w_t, ~~ w_t \sim^{iid} N(0,4702)
+\]</span></p>
+<pre><code>## $fit
+## 
+## Call:
+## arima(x = xdata, order = c(p, d, q), seasonal = list(order = c(P, D, Q), period = S), 
+##     include.mean = !no.constant, transform.pars = trans, fixed = fixed, optim.control = list(trace = trc, 
+##         REPORT = 1, reltol = tol))
+## 
+## Coefficients:
+##           ar1      ar2     sma1
+##       -0.7173  -0.3790  -0.7089
+## s.e.   0.1254   0.1257   0.2202
+## 
+## sigma^2 estimated as 4702:  log likelihood = -337.56,  aic = 683.11
+## 
+## $degrees_of_freedom
+## [1] 56
+## 
+## $ttable
+##      Estimate     SE t.value p.value
+## ar1   -0.7173 0.1254 -5.7225  0.0000
+## ar2   -0.3790 0.1257 -3.0161  0.0038
+## sma1  -0.7089 0.2202 -3.2198  0.0021
+## 
+## $AIC
+## [1] 11.57817
+## 
+## $AICc
+## [1] 11.58556
+## 
+## $BIC
+## [1] 11.71902</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
+<p>This model fits quite well. The spike around lag 2 and the lower end of the Q-Q plot stand out, but do not look like a huge problem.</p>
+</div>
+<div id="prediction" class="section level2">
+<h2>Prediction</h2>
+<p>This is a prediction for the next 24 months.</p>
+<p><img src="index_files/figure-html/unnamed-chunk-13-1.png" width="672" /></p>
+<pre><code>## $pred
+##           Jan      Feb      Mar      Apr      May      Jun      Jul      Aug
+## 2020 1675.143 1442.789 1579.335 1593.680 1740.108 1767.190 1851.684 1774.708
+## 2021 1749.584 1501.415 1630.197 1656.105 1797.181 1823.720 1910.632 1832.127
+##           Sep      Oct      Nov      Dec
+## 2020 1735.190 1719.117 1702.715 1739.025
+## 2021 1792.789 1777.166 1760.374 1796.794
+## 
+## $se
+##            Jan       Feb       Mar       Apr       May       Jun       Jul
+## 2020  69.02733  71.71663  77.28531  87.39357  91.97341  97.65345 103.55022
+## 2021 137.68426 142.96222 148.82627 155.45543 160.84281 166.37141 171.84417
+##            Aug       Sep       Oct       Nov       Dec
+## 2020 108.29493 113.22138 117.97420 122.38194 126.71824
+## 2021 176.94911 181.99801 186.93381 191.68848 196.33372</code></pre>
+</div>
+</div>
+<div id="comparing-models" class="section level1">
+<h1>Comparing Models</h1>
+<div class="line-block">  The largest difference between the two methods is using the differencing when fitting the SARIMA model. This allowed for a much better fit. Residuals for the ARMA model had correlation when they should not have. This is due to the poor fit of the trend. On a similar note, the parabolic trend used for in the first did not capture the overall trend very well. The forecast continued the trend and went down. In reality, the trend would go up as in the figure above. This would have been slightly better if R allows fitting a higher order polynomial as I mentioned before.</div>
+</div>
+<div id="conclusion" class="section level1">
+<h1>Conclusion</h1>
+<div class="line-block">  In general, differencing is much easier and effective at capturing complicated trends. Seasonal AR and MA componets also add very important correlation to a model. A more complicated ARIMA is not always needed, but there are many benefits.</div>
+</div>
+<div id="code" class="section level1">
+<h1>Code</h1>
+<pre class="R"><code>knitr::opts_chunk$set(echo = FALSE, fig.height=3.5, message=FALSE, warning=FALSE)
+library(readr)
+library(knitr)
+library(astsa)
+homicides &lt;- ts(read_csv(&quot;deaths.csv&quot;), start = 2014, frequency = 12)
+plot(homicides, main = &quot;Homicides Per Month (2014-2019)&quot;)
+t &lt;- time(homicides)
+trend.coef &lt;- lm(homicides ~ poly(t, 2, raw = TRUE))$coefficients
+trend &lt;- trend.coef[1] + trend.coef[2]*t + trend.coef[3]*t^2
+plot(homicides, main = &quot;Homicides Per Month with Trend&quot;)
+lines(trend, col = &quot;red&quot;, lty = 2)
+detrended &lt;- homicides - trend
+plot(detrended, main = &quot;Detrended&quot;)
+abline(h = 0, col = &quot;red&quot;, lty = 2)
+M = factor(rep(month.abb, length.out = 72), levels = month.abb)
+seasonal.means &lt;- lm(detrended ~ M + 0)$coefficients
+seasonality.ts &lt;- ts(rep(seasonal.means, length.out = 72), start = 2014, frequency = 12)
+round(seasonal.means, 2)
+plot(detrended, ylab = &quot;deaths&quot;, main = &quot;detrended&quot;)
+lines(seasonality.ts, col = &quot;red&quot;, lty = 2)
+z &lt;- detrended - seasonality.ts
+plot(z, ylab = &quot;deaths&quot;, main = &quot;detrended and desesonalized&quot;)
+cf &lt;- acf2(z)
+model &lt;- arima(z, order = c(3,0,0))
+model
+par(mfrow = c(2,2))
+residuals &lt;- model$residuals
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf &lt;- acf1(residuals)
+lag &lt;- 1:20
+lags &lt;- as.list(lag)
+p.values &lt;- sapply(lags, function(x) Box.test(residuals, x, &quot;Ljung-Box&quot;)$p.value)
+plot(lag, p.values, ylim = c(0,1), main = &quot;Box Test P-values for the Residuals&quot;)
+abline(h=0.05, col = &quot;blue&quot;, lty = 2)
+lower = model$coef - 1.96 * sqrt(diag(model$var.coef))
+upper = model$coef + 1.96 * sqrt(diag(model$var.coef))
+rbind(lower,upper)
+coef &lt;- round(c(model$coef, model$sigma2),3)
+round(seasonal.means, 2)
+model.sarima &lt;- sarima(homicides, 2, 1, 0, 0, 1, 1, 12, details = F)
+model.sarima
+residuals &lt;- model.sarima$fit$residuals
+par(mfrow = c(2,2))
+plot(residuals)
+qqnorm(residuals)
+qqline(residuals)
+acf &lt;- acf1(residuals)
+lag &lt;- 1:35
+lags &lt;- as.list(lag)
+p.values &lt;- sapply(lags, function(x) Box.test(residuals, x, &quot;Ljung-Box&quot;)$p.value)
+plot(lag, p.values, ylim = c(0,1), main = &quot;Box Test P-values for the Residuals&quot;)
+abline(h=0.05, col = &quot;blue&quot;, lty = 2)
+sarima.for(homicides, 24, 2, 1, 0, 0, 1, 1, 12)
+savehistory(&quot;C:/Users/AlexC/OneDrive/rws/5550/project/code.Rhistory&quot;)</code></pre>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
