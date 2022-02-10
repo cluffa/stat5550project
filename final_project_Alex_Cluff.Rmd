@@ -18,12 +18,13 @@ knitr::opts_chunk$set(echo=TRUE, fig.height=3.5, message=FALSE, warning=FALSE)
 library(readr)
 library(knitr)
 library(astsa)
-homicides <- ts(read_csv("deaths.csv"), start = 2014, frequency = 12)
+homicides <- ts(read_csv("deaths.csv", show_col_types = FALSE), start = 2014, frequency = 12)
 ```
 
 # Introduction
 
 |   The original dataset is called "Monthly Counts of Deaths by Select Causes, 2014-2019" from catalog.data.gov [[link]](https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2014-2019). The counts are exclusively from the US. The analysis will be done on a subset of this data. Specifically death counts by homicide.
+
 ```{r}
 plot(homicides, main = "Homicides Per Month (2014-2019)")
 ```
