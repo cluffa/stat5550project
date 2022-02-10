@@ -9,12 +9,12 @@ The data is monthly counts of deaths by select causes from 2014-2019 in the US. 
 ```{r message=FALSE, warning=FALSE}
 library(readr)
 deaths.all <- read_csv("Monthly_Counts_of_Deaths_by_Select_Causes__2014-2019.csv")
-sorted.deaths <- dplyr::arrange(deaths.all, Year, Month)
-write_csv(sorted.deaths["Assault (Homicide)"],"only_the_data_im_using.csv")
+sorted.deaths <- data.frame(Homicides = dplyr::arrange(deaths.all, Year, Month)$`Assault (Homicide)`)
+write_csv(sorted.deaths,"deaths.csv")
 ```
 
 ```{r}
-deaths <- ts(sorted.deaths["Assault (Homicide)"], start = 2014, frequency = 12)
+deaths <- ts(sorted.deaths, start = 2014, frequency = 12)
 
 t <- time(deaths)
 coef <- lm(deaths ~ poly(t, 2, raw = TRUE))$coefficients
